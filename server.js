@@ -1,3 +1,4 @@
+require("dotenv").config();
 const {
   KeyObject,
   PublicKeyInput,
@@ -6,20 +7,16 @@ const {
   randomBytes,
 } = require("node:crypto");
 
-const MongoClient = require("mongodb").MongoClient;
-const { ObjectId } = require("mongodb");
-require("dotenv").config();
 const fs = require("fs");
-const url = process.env.MONGO_URI;
-const dbName = process.env.MONGO_DB_NAME;
-const dbCollection = process.env.MONGO_DB_COLLECTION;
+const _ = require("lodash");
+const { Socket } = require("socket.io");
+
 const masterServerPort = process.env.MASTER_SERVER_PORT;
 const secretKey = process.env.SECRET_KEY;
 const token = process.env.AUTH_TOKEN;
 const privateKey = fs.readFileSync("ignore/private-key.pem");
 const publicKey = fs.readFileSync("ignore/public-key.pem");
-const _ = require("lodash");
-const { Socket } = require("socket.io");
+
 /** @type {Socket} */
 const io = require("socket.io")(masterServerPort);
 const {
