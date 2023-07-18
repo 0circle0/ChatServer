@@ -1,0 +1,25 @@
+{
+  "name": "expressserver",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "test": "jest",
+    "start": "node server.js",
+    "coverage": "npx jest --coverage"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "jsonwebtoken": "^9.0.1",
+    "lodash": "^4.17.21",
+    "mongodb": "^5.7.0",
+    "mssql": "^9.1.1",
+    "socket.io": "^4.7.1"
+  },
+  "keywords": [],
+  "description": "",
+  "devDependencies": {
+    "jest": "^29.6.1"
+  }
+}
