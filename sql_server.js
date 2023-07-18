@@ -12,6 +12,7 @@ const adminGetRoomsWherePersonAwaitingApprovalQuery = getQuery('adminGetRoomsWhe
 const getAllPersonsInRoomQuery = getQuery('getAllPersonsInRoom');
 const requestToJoinRoomQuery = getQuery('requestToJoinRoom');
 const createTablesQuery = getQuery('createTables');
+const createRoomQuery = getQuery('createRoom');
 
 const replaceParams = (query, params) => {
     if (typeof params !== 'object' || params === null) {
@@ -32,6 +33,10 @@ const replaceParams = (query, params) => {
 
 const getAllPerson = () => {
     return getAllPersonQuery;
+}
+
+const createRoom = (room, publicKey) => {
+    return replaceParams(createRoomQuery, { room, publicKey });
 }
 
 const getRoomsWhereUserIsAdmin = (publicKey) => {
@@ -70,5 +75,6 @@ module.exports = {
     adminGetRoomsWherePersonAwaitingApproval,
     getAllPersonsInRoom,
     requestToJoinRoom,
-    createTables
+    createTables,
+    createRoom
 };
