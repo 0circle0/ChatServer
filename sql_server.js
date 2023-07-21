@@ -13,6 +13,9 @@ const getAllPersonsInRoomQuery = getQuery('getAllPersonsInRoom');
 const requestToJoinRoomQuery = getQuery('requestToJoinRoom');
 const createTablesQuery = getQuery('createTables');
 const createRoomQuery = getQuery('createRoom');
+const getRoomsUserIsInQuery = getQuery('getRoomsUserIsIn');
+const insertEventQuery = getQuery('insertEvent');
+const getCreatePersonQuery = getQuery('getCreatePerson');
 
 const replaceParams = (query, params) => {
     if (typeof params !== 'object' || params === null) {
@@ -31,28 +34,48 @@ const replaceParams = (query, params) => {
     return result;
 };
 
+function removePublicKeyArmor(publicKeyWithArmor) {
+    const header = '-----BEGIN RSA PUBLIC KEY-----';
+    const footer = '-----END RSA PUBLIC KEY-----';
+
+    // Define the pattern to capture the public key content
+    const pattern = new RegExp(`${header}(.*?)${footer}`, 's');
+
+    // Extract the public key substring and remove newlines and spaces
+    const publicKey = publicKeyWithArmor.replace(pattern, '$1').replace(/\s+/g, '');
+
+    return publicKey;
+}
+
 const getAllPerson = () => {
     return getAllPersonQuery;
 }
 
 const createRoom = (room, publicKey) => {
-    return replaceParams(createRoomQuery, { room, publicKey });
+    const publicKeyTrimmed = removePublicKeyArmor(publicKey);
+    return replaceParams(createRoomQuery, { room, publicKey: publicKeyTrimmed });
 }
 
 const getRoomsWhereUserIsAdmin = (publicKey) => {
-    return replaceParams(getRoomsWhereUserIsAdminQuery, { publicKey });
+    const publicKeyTrimmed = removePublicKeyArmor(publicKey);
+    return replaceParams(getRoomsWhereUserIsAdminQuery, { publicKey: publicKeyTrimmed });
 }
 
 const adminApproveJoinRequestToRoom = (approverPublicKey, approveePublicKey, room) => {
-    return replaceParams(adminApprovesJoinRequestToRoomQuery, { approverPublicKey, approveePublicKey, room });
+    const approverPublicKeyTrimmed = removePublicKeyArmor(approverPublicKey);
+    const approveePublicKeyTrimmed = removePublicKeyArmor(approveePublicKey);
+    return replaceParams(adminApprovesJoinRequestToRoomQuery, { approverPublicKey: approverPublicKeyTrimmed, approveePublicKey: approveePublicKeyTrimmed, room });
 }
 
 const adminRejectJoinRequestToRoom = (approverPublicKey, approveePublicKey, room) => {
-    return replaceParams(adminRejectsJoinRequestToRoomQuery, { approverPublicKey, approveePublicKey, room });
+    const approverPublicKeyTrimmed = removePublicKeyArmor(approverPublicKey);
+    const approveePublicKeyTrimmed = removePublicKeyArmor(approveePublicKey);
+    return replaceParams(adminRejectsJoinRequestToRoomQuery, { approverPublicKey: approverPublicKeyTrimmed, approveePublicKey: approveePublicKeyTrimmed, room });
 }
 
 const adminGetRoomsWherePersonAwaitingApproval = (publicKey) => {
-    return replaceParams(adminGetRoomsWherePersonAwaitingApprovalQuery, { publicKey });
+    const publicKeyTrimmed = removePublicKeyArmor(publicKey);
+    return replaceParams(adminGetRoomsWherePersonAwaitingApprovalQuery, { publicKey:publicKeyTrimmed });
 }
 
 const getAllPersonsInRoom = (room) => {
@@ -60,11 +83,27 @@ const getAllPersonsInRoom = (room) => {
 }
 
 const requestToJoinRoom = (publicKey, room) => {
-    return replaceParams(requestToJoinRoomQuery, { publicKey, room });
+    const publicKeyTrimmed = removePublicKeyArmor(publicKey);
+    return replaceParams(requestToJoinRoomQuery, { publicKey: publicKeyTrimmed, room });
 }
 
 const createTables = () => {
     return createTablesQuery;
+}
+
+const getRoomsUserIsIn = (publicKey) => {
+    const publicKeyTrimmed = removePublicKeyArmor(publicKey);
+    return replaceParams(getRoomsUserIsInQuery, { publicKey: publicKeyTrimmed });
+}
+
+const insertEvent = (socket, publicKey, eventType, eventDescription) => {
+    const publicKeyTrimmed = removePublicKeyArmor(publicKey);
+    return replaceParams(insertEventQuery, { publicKey: publicKeyTrimmed, eventType, eventDescription, ipAddress: socket.handshake.address });
+}
+
+const getCreatePerson = (publicKey) => {
+    const publicKeyTrimmed = removePublicKeyArmor(publicKey);
+    return replaceParams(getCreatePersonQuery, { publicKey: publicKeyTrimmed });
 }
 
 module.exports = {
@@ -76,5 +115,8 @@ module.exports = {
     getAllPersonsInRoom,
     requestToJoinRoom,
     createTables,
-    createRoom
+    createRoom,
+    getRoomsUserIsIn,
+    insertEvent,
+    getCreatePerson
 };

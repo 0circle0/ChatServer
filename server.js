@@ -28,31 +28,40 @@ const {
 
 
 const executeQuery = require("./queryHandler");
-const { getRoomsWhereUserIsAdmin,
+const {
+  getRoomsWhereUserIsAdmin,
   getAllPerson,
   adminApproveJoinRequestToRoom,
   adminRejectJoinRequestToRoom,
   adminGetRoomsWherePersonAwaitingApproval,
   getAllPersonsInRoom,
   requestToJoinRoom,
-  createTables
+  createTables,
+  createRoom,
+  getRoomsUserIsIn,
+  insertEvent,
+  getCreatePerson,
 } = require("./sql_server");
-
-executeQuery(getAllPersonsInRoom('123 Room'))
-  .then((result) => {
-    console.log(result);
-  }).catch((err) => {
-    console.error(err);
-  });
-
+const { INVALID_TOKEN_VALIDATION, BAD_TOKEN } = require("./constants/errors");
 
 /**
- * @type {{ id: String, publicKey: string | KeyObject | Buffer | PublicKeyInput | JsonWebKeyInput }[]}
+ * @type {{ 
+ *     id: String, 
+ *     publicKey: string | KeyObject | Buffer | PublicKeyInput | JsonWebKeyInput, 
+ *     publicValidationCode: Buffer, 
+ *     rooms: String[], 
+ *     adminRooms: String[],
+ *     awaitingApprovalRooms
+ * }[]}
  */
 let connectedUsers = [];
 
 io.use((socket, next) => middleware(socket, next));
 
+/**
+ * @param {Socket} socket 
+ * @param {Function} next
+ */
 const middleware = (socket, next) => {
   const authToken = socket.handshake.auth.token;
   if (authToken === token) {
@@ -66,6 +75,10 @@ const middleware = (socket, next) => {
 
 io.on("connection", (/** @type {Socket} */ socket) => onConnect(socket));
 
+/**
+ * 
+ * @param {Socket} socket 
+ */
 const onConnect = ((socket) => {
   console.log("A client connected:", socket.id);
 
@@ -74,6 +87,12 @@ const onConnect = ((socket) => {
   socket.on("requestToken", (publicKey) => requestToken(socket, publicKey));
 })
 
+/**
+ * 
+ * @param {Socket} socket 
+ * @param {string | Buffer | KeyObject | PublicKeyInput | JsonWebKeyInput} publicKey 
+ * @returns 
+ */
 const requestToken = (socket, publicKey) => {
   if (_.isNil(publicKey) || !isValidRSAPublicKey(publicKey)) {
     console.log("Not a valid RSA Public Key");
@@ -86,7 +105,7 @@ const requestToken = (socket, publicKey) => {
   const jwtToken = encryptWithPrivateKey(jwt, privateKey);
   const publicValidationCode = randomBytes(16);
 
-  connectedUsers.push({ id: socket.id, publicKey, publicValidationCode });
+  connectedUsers.push({ id: socket.id, publicKey, publicValidationCode, rooms: [], adminRooms: [], awaitingApprovalRooms: [] });
 
   const validator = publicEncrypt(publicKey, publicValidationCode);
   socket.emit("token", { jwtToken, validator });
@@ -94,20 +113,40 @@ const requestToken = (socket, publicKey) => {
   socket.on("validate", ({ validated }) => validate(socket, validated));
 };
 
-const validate = (socket, validated) => {
-  const { publicValidationCode } = connectedUsers.find(
+/** 
+ * @param {Socket} socket  
+ * @param {Buffer} validated
+*/
+const validate = async (socket, validated) => {
+  const userData = connectedUsers.find(
     (obj) => obj.id === socket.id
   );
-  if (!_.isEqual(validated, publicValidationCode)) {
-    console.log("Invalid validation code");
+  
+  if (_.isNil(userData)) {
+    console.log("User not found");
     socket.disconnect();
     return;
   }
 
+  if (!_.isEqual(validated, userData.publicValidationCode)) {
+    console.log("Invalid validation code");
+    await executeQuery(insertEvent(socket, userData.publicKey, INVALID_TOKEN_VALIDATION, BAD_TOKEN))
+    socket.disconnect();
+    return;
+  }
+  await executeQuery(getCreatePerson(userData.publicKey));
+  userData.rooms = await executeQuery(getRoomsUserIsIn(userData.publicKey));
+  userData.adminRooms = await executeQuery(getRoomsWhereUserIsAdmin(userData.publicKey));
+  userData.awaitingApprovalRooms = await executeQuery(adminGetRoomsWherePersonAwaitingApproval(userData.publicKey));
+
+  console.log("UserData", userData);
   console.log("Validation successful");
   socket.emit("validated");
 };
 
+/**
+ * @param {Socket} socket 
+ */
 const disconnect = (socket) => {
   console.log("User disconnected", socket.id);
   var index = connectedUsers.findIndex((obj) => obj.id === socket.id);
