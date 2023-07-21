@@ -21,15 +21,15 @@ const config = {
 const pool = new sql.ConnectionPool(config);
 
 /** @param {string} query */
-async function executeQuery(query) {
+const executeQuery = async (query) => {
     if (query.includes('$'))
         return null;
     try {
         await pool.connect();
 
         const request = pool.request();
-        const result = await request.query(query);
-        return result.recordset;
+        const { recordset } = await request.query(query);
+        return recordset;
     } catch (err) {
         throw err;
     } finally {

@@ -2,7 +2,7 @@ Use Chat
 DECLARE @roomId uniqueidentifier
 DECLARE @personId uniqueidentifier
 DECLARE @roomName nvarchar(50)
-DECLARE @publicKey nvarchar(255)
+DECLARE @publicKey nvarchar(450)
 
 SET @roomName = '${room}'
 SET @publicKey = '${publicKey}'

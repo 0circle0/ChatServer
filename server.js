@@ -42,7 +42,16 @@ const {
   insertEvent,
   getCreatePerson,
 } = require("./sql_server");
-const { INVALID_TOKEN_VALIDATION, BAD_TOKEN } = require("./constants/errors");
+const { 
+  INVALID_TOKEN_VALIDATION,
+  INVALID_TOKEN_VALIDATION_DESCRIPTION,
+  INVALID_CREDENTIALS,
+  INVALID_CREDENTIALS_DESCRIPTION,
+  INVALID_PUBLICKEY,
+  INVALID_PUBLICKEY_DESCRIPTION,
+  PERSON_NOT_ALLOWED,
+  PERSON_NOT_ALLOWED_DESCRIPTION
+} = require("./constants/errors");
 
 /**
  * @type {{ 
@@ -51,7 +60,8 @@ const { INVALID_TOKEN_VALIDATION, BAD_TOKEN } = require("./constants/errors");
  *     publicValidationCode: Buffer, 
  *     rooms: String[], 
  *     adminRooms: String[],
- *     awaitingApprovalRooms
+ *     awaitingApprovalRooms,
+ *     lastSeen: Date,
  * }[]}
  */
 let connectedUsers = [];
@@ -62,13 +72,14 @@ io.use((socket, next) => middleware(socket, next));
  * @param {Socket} socket 
  * @param {Function} next
  */
-const middleware = (socket, next) => {
+const middleware = async (socket, next) => {
   const authToken = socket.handshake.auth.token;
   if (authToken === token) {
     console.log("Authentication successful");
     return next();
   } else {
     console.log("Authentication failed");
+    await executeQuery(insertEvent(socket, publicKey, INVALID_CREDENTIALS, INVALID_CREDENTIALS_DESCRIPTION));
     return next(new Error("Authentication failed"));
   }
 };
@@ -76,7 +87,6 @@ const middleware = (socket, next) => {
 io.on("connection", (/** @type {Socket} */ socket) => onConnect(socket));
 
 /**
- * 
  * @param {Socket} socket 
  */
 const onConnect = ((socket) => {
@@ -88,14 +98,22 @@ const onConnect = ((socket) => {
 })
 
 /**
- * 
  * @param {Socket} socket 
  * @param {string | Buffer | KeyObject | PublicKeyInput | JsonWebKeyInput} publicKey 
  * @returns 
  */
-const requestToken = (socket, publicKey) => {
+const requestToken = async (socket, publicKey) => {
   if (_.isNil(publicKey) || !isValidRSAPublicKey(publicKey)) {
     console.log("Not a valid RSA Public Key");
+    await executeQuery(insertEvent(socket, publicKey, INVALID_PUBLICKEY, INVALID_PUBLICKEY_DESCRIPTION));
+    socket.disconnect();
+    return;
+  }
+  const { lastSeen, isAllowed } = (await executeQuery(getCreatePerson(publicKey)))[0];
+
+  if (!isAllowed) {
+    console.log("Person is not allowed");
+    await executeQuery(insertEvent(socket, publicKey, PERSON_NOT_ALLOWED, PERSON_NOT_ALLOWED_DESCRIPTION));
     socket.disconnect();
     return;
   }
@@ -105,7 +123,7 @@ const requestToken = (socket, publicKey) => {
   const jwtToken = encryptWithPrivateKey(jwt, privateKey);
   const publicValidationCode = randomBytes(16);
 
-  connectedUsers.push({ id: socket.id, publicKey, publicValidationCode, rooms: [], adminRooms: [], awaitingApprovalRooms: [] });
+  connectedUsers.push({ id: socket.id, publicKey, publicValidationCode, rooms: [], adminRooms: [], awaitingApprovalRooms: [], lastSeen });
 
   const validator = publicEncrypt(publicKey, publicValidationCode);
   socket.emit("token", { jwtToken, validator });
@@ -121,7 +139,7 @@ const validate = async (socket, validated) => {
   const userData = connectedUsers.find(
     (obj) => obj.id === socket.id
   );
-  
+
   if (_.isNil(userData)) {
     console.log("User not found");
     socket.disconnect();
@@ -130,11 +148,11 @@ const validate = async (socket, validated) => {
 
   if (!_.isEqual(validated, userData.publicValidationCode)) {
     console.log("Invalid validation code");
-    await executeQuery(insertEvent(socket, userData.publicKey, INVALID_TOKEN_VALIDATION, BAD_TOKEN))
+    await executeQuery(insertEvent(socket, userData.publicKey, INVALID_TOKEN_VALIDATION, INVALID_TOKEN_VALIDATION_DESCRIPTION));
     socket.disconnect();
     return;
   }
-  await executeQuery(getCreatePerson(userData.publicKey));
+
   userData.rooms = await executeQuery(getRoomsUserIsIn(userData.publicKey));
   userData.adminRooms = await executeQuery(getRoomsWhereUserIsAdmin(userData.publicKey));
   userData.awaitingApprovalRooms = await executeQuery(adminGetRoomsWherePersonAwaitingApproval(userData.publicKey));
