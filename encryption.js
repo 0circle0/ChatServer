@@ -1,29 +1,15 @@
 require("dotenv").config();
-const {
-  randomBytes,
-  publicEncrypt,
-  createCipheriv,
-  createDecipheriv,
-  createPublicKey,
-  privateDecrypt,
-  privateEncrypt,
-  RsaPrivateKey,
-  KeyLike,
-  KeyObject,
-  PublicKeyInput,
-  JsonWebKeyInput,
-  sign,
-} = require("node:crypto");
+const crypto = require("node:crypto");
 const _ = require("lodash");
 const jwt = require("jsonwebtoken");
 
 /**
- * @param {String} message
+ * @param { String } message
  */
 const encryptMessage = (message) => {
-  const sessionKey = randomBytes(32);
-  const iv = randomBytes(16);
-  const cipher = createCipheriv("aes-256-cbc", sessionKey, iv);
+  const sessionKey = crypto.randomBytes(32);
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv("aes-256-cbc", sessionKey, iv);
   let encrypted = cipher.update(_.isNil(message) ? "" : message, "utf8", "hex");
   encrypted += cipher.final("hex");
   const ivHex = iv.toString("hex");
@@ -38,7 +24,7 @@ const decryptMessage = (encryptedMessageWithIV, sessionKey) => {
   // Recipient creates decipher using session key and received IV for decryption
   let decrypted;
   try {
-    const decipher = createDecipheriv("aes-256-cbc", sessionKey, receivedIV);
+    const decipher = crypto.createDecipheriv("aes-256-cbc", sessionKey, receivedIV);
     decrypted = decipher.update(
       encryptedMessageWithIV.slice(32),
       "hex",
@@ -52,52 +38,52 @@ const decryptMessage = (encryptedMessageWithIV, sessionKey) => {
 };
 
 const encryptWithPrivateKey = (data, privateKey) => {
-  return privateEncrypt(privateKey, data);
+  return crypto.privateEncrypt(privateKey, data);
 }
 
 /**
- * @param {WithImplicitCoercion<ArrayBuffer | SharedArrayBuffer>} encryptedMessageWithIV
- * @param {RsaPrivateKey | KeyLike} privateKey
- * @param {NoedeJs.ArrayBufferView} publicEncryptedSession
+ * @param { WithImplicitCoercion<ArrayBuffer | SharedArrayBuffer> } encryptedMessageWithIV
+ * @param { crypto.RsaPrivateKey | crypto.KeyLike } privateKey
+ * @param { NoedeJs.ArrayBufferView } publicEncryptedSession
  */
 const decryptPublicMessage = (
   encryptedMessageWithIV,
   privateKey,
   publicEncryptedSession
 ) => {
-  const sessionKey = privateDecrypt(privateKey, publicEncryptedSession);
+  const sessionKey = crypto.privateDecrypt(privateKey, publicEncryptedSession);
 
   return decryptMessage(encryptedMessageWithIV, sessionKey);
 };
 
 /**
- * @param {String} message
- * @param {{publicKey: RsaPrivateKey | KeyLike | RsaPublicKey, id: String}[]} publicKeysWithID
+ * @param { String } message
+ * @param { { publicKey: crypto.RsaPrivateKey | crypto.KeyLike | crypto.RsaPublicKey, id: String }[] } publicKeysWithID
  */
 const encryptPublicMessage = (message, publicKeysWithID, privateKey) => {
   const { sessionKey, encryptedMessageWithIV } = encryptMessage(message);
 
   /**
-   * @type {{encryptedSessionKey: Buffer, id: String, signature: Buffer}[]}
+   * @type { { encryptedSessionKey: Buffer, id: String, signature: Buffer }[] }
    */
   const packets = [];
 
   publicKeysWithID.forEach((publicKeyId) => {
     const { publicKey, id } = publicKeyId;
-    const encryptedSessionKey = publicEncrypt(publicKey, sessionKey);
-    const signature = sign("RSA-SHA256", encryptedSessionKey, privateKey);
+    const encryptedSessionKey = crypto.publicEncrypt(publicKey, sessionKey);
+    const signature = crypto.sign("RSA-SHA256", encryptedSessionKey, privateKey);
     packets.push({ encryptedSessionKey, id, signature });
   });
 
-  return {packets, encryptedMessageWithIV};
+  return { packets, encryptedMessageWithIV };
 };
 
 /**
- * @param {string | KeyObject | Buffer | PublicKeyInput | JsonWebKeyInput} publicKey
+ * @param { String | crypto.KeyObject | Buffer | crypto.PublicKeyInput | crypto.JsonWebKeyInput } publicKey
  * */
 const isValidRSAPublicKey = (publicKey) => {
   try {
-    createPublicKey(publicKey);
+    crypto.createPublicKey(publicKey);
     return true;
   } catch (err) {
     return false;

@@ -1,5 +1,5 @@
 require('dotenv').config();
-const sql = require('mssql');
+const { ConnectionPool } = require('mssql');
 
 const config = {
     server: process.env.DB_SERVER,
@@ -9,32 +9,44 @@ const config = {
     database: process.env.DB_DATABASE,
     options: {
         encrypt: false,
-        trustedConnection: true
+        trustedConnection: true,
     },
     pool: {
         max: 10,
         min: 0,
-        idleTimeoutMillis: 30000
+        idleTimeoutMillis: 1000,
+    },
+};
+
+const pool = new ConnectionPool(config);
+
+const connect = () => {
+    // Connect to the database when the application starts
+    pool.connect().catch((err) => {
+        console.error('Database connection failed:', err.message);
+    });
+}
+
+const closePools = async () => {
+    try {
+        await pool.close();
+    } catch (err) {
+        console.error('Error closing connection pool:', err.message);
     }
 };
 
-const pool = new sql.ConnectionPool(config);
-
 /** @param {string} query */
 const executeQuery = async (query) => {
-    if (query.includes('$'))
-        return null;
+    if (query.includes('$')) {
+        return null
+    };
     try {
-        await pool.connect();
-
         const request = pool.request();
         const { recordset } = await request.query(query);
         return recordset;
     } catch (err) {
         throw err;
-    } finally {
-        pool.close();
     }
-}
+};
 
-module.exports = executeQuery;
+module.exports = { executeQuery, closePools, connect };

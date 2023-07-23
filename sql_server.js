@@ -37,11 +37,7 @@ const replaceParams = (query, params) => {
 function removePublicKeyArmor(publicKeyWithArmor) {
     const header = '-----BEGIN RSA PUBLIC KEY-----';
     const footer = '-----END RSA PUBLIC KEY-----';
-
-    // Define the pattern to capture the public key content
     const pattern = new RegExp(`${header}(.*?)${footer}`, 's');
-
-    // Extract the public key substring and remove newlines and spaces
     const publicKey = publicKeyWithArmor.replace(pattern, '$1').replace(/\s+/g, '');
 
     return publicKey;
@@ -75,7 +71,7 @@ const adminRejectJoinRequestToRoom = (approverPublicKey, approveePublicKey, room
 
 const adminGetRoomsWherePersonAwaitingApproval = (publicKey) => {
     const publicKeyTrimmed = removePublicKeyArmor(publicKey);
-    return replaceParams(adminGetRoomsWherePersonAwaitingApprovalQuery, { publicKey:publicKeyTrimmed });
+    return replaceParams(adminGetRoomsWherePersonAwaitingApprovalQuery, { publicKey: publicKeyTrimmed });
 }
 
 const getAllPersonsInRoom = (room) => {
@@ -97,7 +93,9 @@ const getRoomsUserIsIn = (publicKey) => {
 }
 
 const insertEvent = (socket, publicKey, eventType, eventDescription) => {
-    const publicKeyTrimmed = removePublicKeyArmor(publicKey);
+    let publicKeyTrimmed = null;
+    if (publicKey != null)
+        publicKeyTrimmed = removePublicKeyArmor(publicKey);
     return replaceParams(insertEventQuery, { publicKey: publicKeyTrimmed, eventType, eventDescription, ipAddress: socket.handshake.address });
 }
 
