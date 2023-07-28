@@ -16,8 +16,8 @@ require("dotenv").config();
 const token = process.env.AUTH_TOKEN;
 
 const connectedUsersMock = [
-  { id: "socket1", publicValidationCode: "abc123", publicKey: "publicKey1" },
-  { id: "socket2", publicValidationCode: "def456", publicKey: "publicKey2" },
+  { id: "socket1", publicValidationCode: "abc123abc123ab12", publicKey: "publicKey1" },
+  { id: "socket2", publicValidationCode: "def456def456def4", publicKey: "publicKey2" },
 ];
 
 let socketMock = {
@@ -82,8 +82,8 @@ beforeEach((done) => {
       address: "::1"
     },
   };
-  setConnectedUsers([{ id: "socket1", publicValidationCode: "abc123", publicKey: "publicKey1" },
-    { id: "socket2", publicValidationCode: "def456", publicKey: "publicKey2" },]);
+  setConnectedUsers([{ id: "socket1", publicValidationCode: "abc123abc123ab12", publicKey: "publicKey1" },
+    { id: "socket2", publicValidationCode: "def456def456def4", publicKey: "publicKey2" },]);
   done();
 });
 
@@ -92,7 +92,7 @@ afterAll((done) => {
 });
 
 test("validate should emit 'validated' event when validation is successful", async () => {
-  const validated = "abc123";
+  const validated = "abc123abc123ab12";
   
   await validate(socketMock, validated);
 
@@ -101,10 +101,16 @@ test("validate should emit 'validated' event when validation is successful", asy
 });
 
 test("validate should disconnect user when user is not found", async () => {
-  const validated = "abc123";
+  const validated = "abc123abc123ab17";
   const socketMock = {
     id: "j",
     disconnect: jest.fn(),
+    handshake: {
+      auth: {
+        token: token,
+      },
+      address: "::1"
+    },
   };
 
   await validate(socketMock, validated);
@@ -114,10 +120,21 @@ test("validate should disconnect user when user is not found", async () => {
 });
 
 test("validate should disconnect socket and not emit 'validated' event when validation fails", async () => {
-  const validated = "invalidCode";
+  const validated = "invalidCode12345";
 
   await validate(socketMock, validated);
 
+  expect(console.log).toHaveBeenCalledWith("Invalid validation code");
+  expect(socketMock.disconnect).toHaveBeenCalled();
+  expect(socketMock.emit).not.toHaveBeenCalled();
+});
+
+test("validate should disconnect socket and not emit 'validated' event when validation code is incorrect format", async () => {
+  const validated = 1234567891234567;
+
+  await validate(socketMock, validated);
+
+  expect(console.log).toHaveBeenCalledWith("Validation failed. Not a Buffer or length is not 16");
   expect(socketMock.disconnect).toHaveBeenCalled();
   expect(socketMock.emit).not.toHaveBeenCalled();
 });

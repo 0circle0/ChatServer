@@ -20,11 +20,9 @@ const config = {
 
 const pool = new ConnectionPool(config);
 
-const connect = () => {
+const connect = async () => {
     // Connect to the database when the application starts
-    pool.connect().catch((err) => {
-        console.error('Database connection failed:', err.message);
-    });
+    await pool.connect();
 }
 
 const closePools = async () => {
@@ -35,13 +33,24 @@ const closePools = async () => {
     }
 };
 
-/** @param {string} query */
-const executeQuery = async (query) => {
+/** 
+ * @param {string} query
+ * @param {Object} parameters
+ */
+const executeQuery = async (query, parameters) => {
     if (query.includes('$')) {
-        return null
-    };
+        return null;
+    }
+
     try {
         const request = pool.request();
+
+        if (parameters) {
+            Object.keys(parameters).forEach((paramName) => {
+                request.input(paramName, parameters[paramName]);
+            });
+        }
+
         const { recordset } = await request.query(query);
         return recordset;
     } catch (err) {
@@ -49,4 +58,5 @@ const executeQuery = async (query) => {
     }
 };
 
-module.exports = { executeQuery, closePools, connect };
+
+module.exports = { executeQuery, closePools, connect, pool };

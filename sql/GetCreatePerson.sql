@@ -1,9 +1,7 @@
 Use Chat
 
-DECLARE @publicKey nvarchar(392)
 DECLARE @date DATETIME
 
-SET @publicKey = '${publicKey}'
 SET @date = GETDATE()
 
 INSERT INTO Person (id, publicKey, lastSeen, isAllowed)

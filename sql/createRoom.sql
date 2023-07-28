@@ -2,10 +2,8 @@ Use Chat
 DECLARE @roomId uniqueidentifier
 DECLARE @personId uniqueidentifier
 DECLARE @roomName nvarchar(50)
-DECLARE @publicKey nvarchar(450)
 
-SET @roomName = '${room}'
-SET @publicKey = '${publicKey}'
+SET @roomName = @room
 
 SET @personId = (SELECT id FROM Person WHERE publicKey = @publicKey)
 

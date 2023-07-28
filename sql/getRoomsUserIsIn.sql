@@ -1,7 +1,7 @@
 Use Chat
 declare @userID uniqueidentifier
 
-set @userId = (select id from Person where publicKey = '${publicKey}')
+set @userId = (select id from Person where publicKey = @publicKey)
 
 SELECT room
 FROM Rooms R

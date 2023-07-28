@@ -22,7 +22,7 @@ process.on("SIGINT", () => {
 });
 
 const query = require("./sql_server");
-const { 
+const {
   INVALID_TOKEN_VALIDATION,
   INVALID_TOKEN_VALIDATION_DESCRIPTION,
   INVALID_CREDENTIALS,
@@ -60,7 +60,7 @@ const middleware = async (socket, next) => {
     return next();
   } else {
     console.log("Authentication failed");
-    await queryHandler.executeQuery(query.insertEvent(socket, publicKey, INVALID_CREDENTIALS, INVALID_CREDENTIALS_DESCRIPTION));
+    await queryHandler.executeQuery(query.insertEventQuery, { ipAddress: socket.handshake.address, publicKey, eventType: INVALID_CREDENTIALS, eventDescription: INVALID_CREDENTIALS_DESCRIPTION });
     return next(new Error("Authentication failed"));
   }
 };
@@ -83,18 +83,20 @@ const onConnect = ((socket) => {
  * @param {string | Buffer | crypto.KeyObject | crypto.PublicKeyInput | crypto.JsonWebKeyInput} publicKey 
  * @returns 
  */
+
 const requestToken = async (socket, publicKey) => {
   if (_.isNil(publicKey) || !encryption.isValidRSAPublicKey(publicKey)) {
     console.log("Not a valid RSA Public Key");
-    await queryHandler.executeQuery(query.insertEvent(socket, publicKey, INVALID_PUBLICKEY, INVALID_PUBLICKEY_DESCRIPTION));
+    await queryHandler.executeQuery(query.insertEventQuery, { ipAddress: socket.handshake.address, publicKey, INVALID_PUBLICKEY, INVALID_PUBLICKEY_DESCRIPTION });
     socket.disconnect();
     return;
   }
-  const { lastSeen, isAllowed } = (await queryHandler.executeQuery(query.getCreatePerson(publicKey)))[0];
+
+  const { lastSeen, isAllowed } = (await queryHandler.executeQuery(query.getCreatePersonQuery, { publicKey }))[0];
 
   if (!isAllowed) {
     console.log("Person is not allowed");
-    await queryHandler.executeQuery(query.insertEvent(socket, publicKey, PERSON_NOT_ALLOWED, PERSON_NOT_ALLOWED_DESCRIPTION));
+    await queryHandler.executeQuery(query.insertEventQuery, { ipAddress: socket.handshake.address, publicKey, PERSON_NOT_ALLOWED, PERSON_NOT_ALLOWED_DESCRIPTION });
     socket.disconnect();
     return;
   }
@@ -117,6 +119,14 @@ const requestToken = async (socket, publicKey) => {
  * @param {Buffer} validated
 */
 const validate = async (socket, validated) => {
+  // Make sure validated is of type Buffer
+  if (!Buffer.isBuffer(validated) && validated.length !== 16) {
+    console.log("Validation failed. Not a Buffer or length is not 16");
+    await queryHandler.executeQuery(query.insertEventQuery, { ipAddress: socket.handshake.address, publicKey, eventType: INVALID_TOKEN_VALIDATION, eventDescription: INVALID_TOKEN_VALIDATION_DESCRIPTION });
+    socket.disconnect();
+    return;
+  }
+
   const userData = connectedUsers.find(
     (obj) => obj.id === socket.id
   );
@@ -129,14 +139,14 @@ const validate = async (socket, validated) => {
 
   if (!_.isEqual(validated, userData.publicValidationCode)) {
     console.log("Invalid validation code");
-    await queryHandler.executeQuery(query.insertEvent(socket, userData.publicKey, INVALID_TOKEN_VALIDATION, INVALID_TOKEN_VALIDATION_DESCRIPTION));
+    await queryHandler.executeQuery(query.insertEventQuery, { ipAddress: socket.handshake.address, publicKey: userData.publicKey, eventType: INVALID_TOKEN_VALIDATION, eventDescription: INVALID_TOKEN_VALIDATION_DESCRIPTION });
     socket.disconnect();
     return;
   }
 
-  userData.rooms = await queryHandler.executeQuery(query.getRoomsUserIsIn(userData.publicKey));
-  userData.adminRooms = await queryHandler.executeQuery(query.getRoomsWhereUserIsAdmin(userData.publicKey));
-  userData.awaitingApprovalRooms = await queryHandler.executeQuery(query.adminGetRoomsWherePersonAwaitingApproval(userData.publicKey));
+  userData.rooms = await queryHandler.executeQuery(query.getRoomsUserIsInQuery, { publicKey: userData.publicKey });
+  userData.adminRooms = await queryHandler.executeQuery(query.getRoomsWhereUserIsAdminQuery, { publicKey: userData.publicKey });
+  userData.awaitingApprovalRooms = await queryHandler.executeQuery(query.adminGetRoomsWherePersonAwaitingApprovalQuery, { publicKey: userData.publicKey });
 
   console.log("UserData", userData);
   console.log("Validation successful");
